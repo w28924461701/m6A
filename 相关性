@@ -1,0 +1,53 @@
+setwd('H:\\TCGA')
+library(tidyverse)
+library(corrplot)
+rt<-read.csv('data4.csv',header = T,check.names = F,row.names = 1)
+d<-rt[1:5,1:5]
+rtt<-t(rt)
+d1<-rtt[1:5,1:5]
+rtt<-data.frame(rtt)
+
+rtt%>%select('RB1','METTL14','PDCD1','CD274')->rtt1
+
+library(cowplot)
+p1 <- ggscatterstats(data = rtt1,
+                     y = PDCD1,
+                     x = METTL14,
+                     centrality.para = "mean",
+                     margins = "both",
+                     xfill = "#CC79A7",
+                     yfill = "#009E73",
+                     marginal.type = "histogram",
+                     title = "Relationship between PDCD1 and METTL14")
+
+p2 <- ggscatterstats(data =rtt1,
+                     y = RB1,
+                     x = METTL14,
+                     centrality.para = "mean",
+                     margins = "both",
+                     xfill = "#CC79A7",
+                     yfill = "#009E73",
+                     marginal.type = "histogram",
+                     title = "Relationship between RB1 and METTL14")
+
+plot_grid(p1,p2,nrow = 1,labels = LETTERS[1:2])
+
+
+
+
+y <- as.numeric(rtt[,"PDCD1"])
+colnames <- colnames(rtt)
+cor_data_df <- data.frame(colnames)
+for (i in 1:length(colnames)){
+  test <- cor.test(as.numeric(rtt[,i]),y,type="spearman")
+  cor_data_df[i,2] <- test$estimate
+  cor_data_df[i,3] <- test$p.value
+}
+names(cor_data_df) <- c("symbol","correlation","pvalue")
+
+library(dplyr)
+library(tidyr)
+cor_data_sig <- cor_data_df %>% 
+  filter(pvalue < 0.05) %>% 
+  arrange(desc(abs(correlation)))%>% 
+  dplyr::slice(1:500)
