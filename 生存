@@ -1,0 +1,81 @@
+library(survival)
+library(caret)
+library(glmnet)
+library(survminer)
+library(tidyverse)
+library(ggplot2)
+
+rt=read.table("expTime.txt",header=T,sep="\t",check.names=F,row.names=1)     #读取输入文件
+rt$futime=(rt$futime/365)*12
+rt<-rt[,-c(3:10)]
+rt<-na.omit(rt)
+sigGenes=c("futime","fustat")
+
+for(i in colnames(rt[,1:3])){
+  
+  case_when(rt[,i]<=unname(quantile(rt[,i],0.25))~ 'low',  
+            rt[,i]>unname(quantile(rt[,i],0.25))&rt[,i]<unname(quantile(rt[,i],0.75))~'median',
+            rt[,i]>=unname(quantile(rt[,i],0.75))~'high')->rt[,i]
+            rt[,i]<-as.factor(rt[,i])
+}
+
+data=rt
+
+dd<-list()
+for(i in 3:ncol(data)){
+  
+  k=colnames(data[i])
+  
+ dd[[k]]<-subset(data,data[,k]=='low'|data[,k]=='high',select = c("bcrmonths","bcr.event",k))
+ dd[[k]][,3]<-as.factor(as.character(dd[[k]][,3]))
+}
+
+R<-list()
+
+for(i in 1:length(dd)){
+  
+   
+ diff=survdiff(Surv(dd[[i]]$bcrmonths,dd[[i]]$bcr.event) ~ dd[[i]][,3],data =dd[[i]])
+
+ pValue=1-pchisq(diff$chisq,df=1)
+
+  if(pValue<0.05){
+   
+  R=c(R,dd[i])
+  
+ }
+}
+for (i in 1:length(R)){
+  Q=R[[i]]
+  fit<- survfit(Surv(futime, fustat) ~Q[,3],data =Q)
+  splots <- list()
+  splots[[1]]<-ggsurvplot(fit,font.legend= 16,font.x =  16, font.y = 16,pval.method.coord=c(2,0.4),pval.coord=c(2,0.25),
+                          font.tickslab = 14,risk.table =TRUE, risk.table.y.text.col = T,conf.int = TRUE, 
+                          risk.table.y.text = FALSE,risk.table.height = 0.2,pval=TRUE,pval.method = TRUE,
+                          pval.method.size = 4,log.rank.weights = "survdiff",main  = "TCGA prcc OS",
+                      legend.title = names(R)[i],
+                surv.median.line = "hv",# 中位生存
+                       palette="lancet")
+  
+ res<-arrange_ggsurvplots(splots, print = F,
+                    ncol = 1, nrow = 1, risk.table.height = 0.25)
+ ggsave(paste(names(R)[i],"All_surv.pdf",sep = "_"), res,width=7,height = 6)
+}
+
+
+BB<-R[[3]]
+fit<- survfit(Surv(futime, fustat) ~LINC02041,data =BB)
+
+P3=ggsurvplot(fit,font.legend= 16,font.x =  16, font.y = 16,pval.method.coord=c(2,0.5),pval.coord=c(2,0.25),
+              font.tickslab = 14,risk.table =TRUE, risk.table.y.text.col = T,conf.int = TRUE, palette = "Dark2",
+              risk.table.y.text = FALSE,risk.table.height = 0.2,pval=TRUE,pval.method = TRUE,
+              pval.method.size = 4,log.rank.weights = "survdiff",legend.title = "LINC02041",
+              legend.labs =  c("High ", "low "),xlab ="Time(years)",break.x.by=2,xlim=c(1,10),
+              ylab="surival probability",censor.shape="|", censor.size = 2,ggtheme = theme_light(), 
+              title = "TCGA prcc OS")
+
+P3$table <- P3$table + theme(axis.line = element_blank())
+
+ggarrange(P3$plot+theme(plot.title = element_text(hjust = 0.5)),P3$table, heights = c(2, 0.7),
+          ncol = 1, nrow =2) # 标题居中
+  
