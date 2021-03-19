@@ -1,0 +1,14 @@
+rt<-select(rt1,c(1:3,11:12))
+
+for(i in colnames(rt[,1:3])){
+  
+  case_when(rt[,i]<=unname(quantile(rt[,i],0.25))~ 'low',  
+            rt[,i]>unname(quantile(rt[,i],0.25))&rt[,i]<unname(quantile(rt[,i],0.75))~'median',
+            rt[,i]>=unname(quantile(rt[,i],0.75))~'high')->rt[,i]
+  rt[,i]<-as.factor(rt[,i])
+}
+
+
+fit<- survfit(Surv(metmonths,met.event) ~rt$PCADNP.6241_s_at,data =rt)
+
+ggsurvplot(fit)
